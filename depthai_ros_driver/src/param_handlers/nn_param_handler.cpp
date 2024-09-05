@@ -134,8 +134,8 @@ void NNParamHandler::setImageManip(const std::string& model_path, std::shared_pt
 std::string NNParamHandler::getModelPath(const nlohmann::json& data) {
     std::string modelPath;
     auto source = data["model"]["zoo"].get<std::string>();
-    if(source == "depthai_examples") {
-        modelPath = ament_index_cpp::get_package_share_directory("depthai_examples") + "/resources/" + data["model"]["model_name"].get<std::string>() + ".blob";
+    if(source == "depthai_ros_driver") {
+        modelPath = ament_index_cpp::get_package_share_directory("depthai_ros_driver") + "/resources/" + data["model"]["model_name"].get<std::string>() + ".blob";
     } else if(source == "path") {
         modelPath = data["model"]["model_name"].get<std::string>();
     } else {
