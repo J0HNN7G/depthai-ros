@@ -4,7 +4,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.conditions import IfCondition, UnlessCondition
-from launch.substitutions import Command, LaunchConfiguration
+from launch.substitutions import Command, LaunchConfiguration, PythonExpression
 from launch_ros.actions import LoadComposableNodes, Node
 from launch_ros.descriptions import ComposableNode
 
@@ -31,6 +31,8 @@ def launch_setup(context, *args, **kwargs):
     namespace = LaunchConfiguration("namespace", default="")
     rs_compat = LaunchConfiguration("rs_compat", default="false")
     use_composition = LaunchConfiguration("use_composition", default="false")
+
+    frame_prefix = PythonExpression(["'", namespace, "' + '/' if '", namespace, "' else ''"])
 
     name = LaunchConfiguration("tf_prefix").perform(context)
     robot_description = {
@@ -73,7 +75,8 @@ def launch_setup(context, *args, **kwargs):
                 "rs_compat:=",
                 rs_compat,
             ]
-        )
+        ),
+        "frame_prefix": frame_prefix
     }
     return [
         Node(
