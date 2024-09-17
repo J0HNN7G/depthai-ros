@@ -34,8 +34,9 @@ const std::vector<std::string> label_map = {
     "laptop",        "mouse",        "remote",        "keyboard",      "cell phone",  "microwave",   "oven",        "toaster",      "sink",
     "refrigerator",  "book",         "clock",         "vase",          "scissors",    "teddy bear",  "hair drier",  "toothbrush"};
 
-dai::Pipeline createPipeline(bool syncNN, bool subpixel, std::string nnPath, int confidence, int LRchecktresh, std::string resolution, bool fullFrameTracking) {
+dai::Pipeline createPipeline(bool syncNN, bool subpixel, std::string nnPath, int confidence, int LRchecktresh, std::string colorResolutionStr, std::string monoResolutionStr, bool fullFrameTracking) {
     dai::Pipeline pipeline;
+    dai::ColorCameraProperties::SensorResolution colorResolution;
     dai::node::MonoCamera::Properties::SensorResolution monoResolution;
     auto colorCam = pipeline.create<dai::node::ColorCamera>();
     auto spatialDetectionNetwork = pipeline.create<dai::node::YoloSpatialDetectionNetwork>();
@@ -54,20 +55,31 @@ dai::Pipeline createPipeline(bool syncNN, bool subpixel, std::string nnPath, int
     xoutTracker->setStreamName("tracklets");
 
     colorCam->setPreviewSize(416, 416);
-    colorCam->setResolution(dai::ColorCameraProperties::SensorResolution::THE_1080_P);
+    if (colorResolutionStr == "720p") {
+        colorResolution = dai::ColorCameraProperties::SensorResolution::THE_720_P;
+    } else if (colorResolutionStr == "1080p") {
+        colorResolution = dai::ColorCameraProperties::SensorResolution::THE_1080_P;
+    } else if (colorResolutionStr == "4K") {
+        colorResolution = dai::ColorCameraProperties::SensorResolution::THE_4_K;
+    } else {
+        RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Invalid parameter. -> colorResolution: %s", colorResolutionStr.c_str());
+        throw std::runtime_error("Invalid color camera resolution.");
+    }
+    
+    colorCam->setResolution(colorResolution);
     colorCam->setInterleaved(false);
     colorCam->setColorOrder(dai::ColorCameraProperties::ColorOrder::BGR);
 
-    if(resolution == "720p") {
+    if(monoResolutionStr == "720p") {
         monoResolution = dai::node::MonoCamera::Properties::SensorResolution::THE_720_P;
-    } else if(resolution == "400p") {
+    } else if(monoResolutionStr == "400p") {
         monoResolution = dai::node::MonoCamera::Properties::SensorResolution::THE_400_P;
-    } else if(resolution == "800p") {
+    } else if(monoResolutionStr == "800p") {
         monoResolution = dai::node::MonoCamera::Properties::SensorResolution::THE_800_P;
-    } else if(resolution == "480p") {
+    } else if(monoResolutionStr == "480p") {
         monoResolution = dai::node::MonoCamera::Properties::SensorResolution::THE_480_P;
     } else {
-        RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Invalid parameter. -> monoResolution: %s", resolution.c_str());
+        RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Invalid parameter. -> monoResolution: %s", monoResolutionStr.c_str());
         throw std::runtime_error("Invalid mono camera resolution.");
     }
 
@@ -137,6 +149,7 @@ int main(int argc, char** argv) {
     std::string nnName(BLOB_NAME);  // Set your blob name for the model here
     bool syncNN, subpixel, fullFrameTracking;
     int confidence = 200, LRchecktresh = 5;
+    std::string colorResolution = "4K";
     std::string monoResolution = "400p";
 
     node->declare_parameter("namespace", "");
@@ -147,6 +160,7 @@ int main(int argc, char** argv) {
     node->declare_parameter("nnName", "");
     node->declare_parameter("confidence", confidence);
     node->declare_parameter("LRchecktresh", LRchecktresh);
+    node->declare_parameter("colorResolution", colorResolution);
     node->declare_parameter("monoResolution", monoResolution);
     node->declare_parameter("resourceBaseFolder", "");
     node->declare_parameter("fullFrameTracking", false);
@@ -158,6 +172,7 @@ int main(int argc, char** argv) {
     node->get_parameter("subpixel", subpixel);
     node->get_parameter("confidence", confidence);
     node->get_parameter("LRchecktresh", LRchecktresh);
+    node->get_parameter("colorResolution", colorResolution);
     node->get_parameter("monoResolution", monoResolution);
     node->get_parameter("resourceBaseFolder", resourceBaseFolder);
     node->get_parameter("fullFrameTracking", fullFrameTracking);
@@ -173,7 +188,7 @@ int main(int argc, char** argv) {
     }
 
     nnPath = resourceBaseFolder + "/" + nnName;
-    dai::Pipeline pipeline = createPipeline(syncNN, subpixel, nnPath, confidence, LRchecktresh, monoResolution, fullFrameTracking);
+    dai::Pipeline pipeline = createPipeline(syncNN, subpixel, nnPath, confidence, LRchecktresh, colorResolution,  monoResolution, fullFrameTracking);
     dai::Device device(pipeline);
 
     auto colorQueue = device.getOutputQueue("preview", 30, false);
@@ -181,32 +196,48 @@ int main(int argc, char** argv) {
     auto trackQueue = device.getOutputQueue("tracklets", 30, false);
     auto calibrationHandler = device.readCalibration();
 
-    int width, height;
+    int colorWidth, colorHeight;
+    if (colorResolution == "720p") {
+        colorWidth = 1280;
+        colorHeight = 720;
+    } else if (colorResolution == "1080p") {
+        colorWidth = 1920;
+        colorHeight = 1080;
+    } else if (colorResolution == "4K") {
+        colorWidth = 3840;
+        colorHeight = 2160;
+    } else {
+        RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Invalid parameter. -> colorResolution: %s", colorResolution.c_str());
+        throw std::runtime_error("Invalid color camera resolution.");
+    }
+
+    int monoWidth, monoHeight;
     if(monoResolution == "720p") {
-        width = 1280;
-        height = 720;
+        monoWidth = 1280;
+        monoHeight = 720;
     } else if(monoResolution == "400p") {
-        width = 640;
-        height = 400;
+        monoWidth = 640;
+        monoHeight = 400;
     } else if(monoResolution == "800p") {
-        width = 1280;
-        height = 800;
+        monoWidth = 1280;
+        monoHeight = 800;
     } else if(monoResolution == "480p") {
-        width = 640;
-        height = 480;
+        monoWidth = 640;
+        monoHeight = 480;
     } else {
         RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Invalid parameter. -> monoResolution: %s", monoResolution.c_str());
         throw std::runtime_error("Invalid mono camera resolution.");
     }
 
+
     auto boardName = calibrationHandler.getEepromData().boardName;
-    if(height > 480 && boardName == "OAK-D-LITE") {
-        width = 640;
-        height = 480;
+    if(monoHeight > 480 && boardName == "OAK-D-LITE") {
+        monoWidth = 640;
+        monoHeight = 480;
     }
 
     dai::rosBridge::ImageConverter rgbConverter(nSpace + '/' + tfPrefix + "_rgb_camera_optical_frame", false);
-    auto rgbCameraInfo = rgbConverter.calibrationToCameraInfo(calibrationHandler, dai::CameraBoardSocket::CAM_A, -1, -1);
+    auto rgbCameraInfo = rgbConverter.calibrationToCameraInfo(calibrationHandler, dai::CameraBoardSocket::CAM_A, colorWidth, colorHeight);
     std::string rgbTopicName = tfPrefix + "/rgb/image_raw";
     dai::rosBridge::BridgePublisher<sensor_msgs::msg::Image, dai::ImgFrame> rgbPublish(colorQueue,
                                                                                        node,
@@ -231,7 +262,7 @@ int main(int argc, char** argv) {
         30);
 
     dai::rosBridge::ImageConverter depthConverter(nSpace + '/' + tfPrefix + "_right_camera_optical_frame", true);
-    auto rightCameraInfo = depthConverter.calibrationToCameraInfo(calibrationHandler, dai::CameraBoardSocket::CAM_C, width, height);
+    auto rightCameraInfo = depthConverter.calibrationToCameraInfo(calibrationHandler, dai::CameraBoardSocket::CAM_C, monoWidth, monoHeight);
     std::string depthTopicName = tfPrefix + "/stereo/image_raw";
     dai::rosBridge::BridgePublisher<sensor_msgs::msg::Image, dai::ImgFrame> depthPublish(
         depthQueue,

@@ -35,6 +35,8 @@ def launch_setup(context, *args, **kwargs):
     fullFrameTracking = LaunchConfiguration('fullFrameTracking', default='false').perform(context)
     namespace = LaunchConfiguration("namespace", default="").perform(context)
     name = LaunchConfiguration("name").perform(context)
+    colorResolution = LaunchConfiguration("colorResolution").perform(context)
+    monoResolution = LaunchConfiguration("monoResolution").perform(context)
 
     color_sens_name = 'rgb'
 
@@ -71,7 +73,9 @@ def launch_setup(context, *args, **kwargs):
                 'sync_nn': bool(sync_nn),
                 'nnName': nnName,
                 'resourceBaseFolder': resourceBaseFolder,
-                'fullFrameTracking': bool(fullFrameTracking)
+                'fullFrameTracking': bool(fullFrameTracking),
+                'colorResolution': colorResolution,
+                'monoResolution': monoResolution,
             }],
         ),
         Node(
@@ -82,10 +86,7 @@ def launch_setup(context, *args, **kwargs):
             remappings=[
                 ('image', f'{name}/{color_sens_name}/image_raw'),
                 ('camera_info', f'{name}/{color_sens_name}/camera_info'),
-                ('image_rect', f'{name}/{color_sens_name}/image_rect'),
-                ('image_rect/compressed', f'{name}/{color_sens_name}/image_rect/compressed'),
-                ('image_rect/compressedDepth', f'{name}/{color_sens_name}/image_rect/compressedDepth'),
-                ('image_rect/theora', f'{name}/{color_sens_name}/image_rect/theora'),
+                ('image_rect', f'{name}/{color_sens_name}/image_rect')
             ]
         )
     ]
@@ -97,7 +98,7 @@ def generate_launch_description():
     declared_arguments = [
         DeclareLaunchArgument('name', default_value='oak'),
         DeclareLaunchArgument('namespace', default_value=''),
-        DeclareLaunchArgument('camera_model', default_value='OAK-D'),
+        DeclareLaunchArgument('camera_model', default_value='OAK-D-LITE'),
         DeclareLaunchArgument('parent_frame', default_value='oak-d-base-frame'),
         DeclareLaunchArgument('cam_pos_x', default_value='0.0'),
         DeclareLaunchArgument('cam_pos_y', default_value='0.0'),
@@ -111,6 +112,8 @@ def generate_launch_description():
         DeclareLaunchArgument('nnName', default_value='x'),
         DeclareLaunchArgument('resourceBaseFolder', default_value=os.path.join(depthai_examples_path, 'resources')),
         DeclareLaunchArgument('fullFrameTracking', default_value='false'),
+        DeclareLaunchArgument('colorResolution', default_value='1080p'),
+        DeclareLaunchArgument('monoResolution', default_value='400p')
     ]
 
     return LaunchDescription(
