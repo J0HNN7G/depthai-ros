@@ -34,9 +34,8 @@ const std::vector<std::string> label_map = {
     "laptop",        "mouse",        "remote",        "keyboard",      "cell phone",  "microwave",   "oven",        "toaster",      "sink",
     "refrigerator",  "book",         "clock",         "vase",          "scissors",    "teddy bear",  "hair drier",  "toothbrush"};
 
-dai::Pipeline createPipeline(bool syncNN, bool subpixel, std::string nnPath, int confidence, int LRchecktresh, std::string colorResolutionStr, std::string monoResolutionStr, bool fullFrameTracking) {
+dai::Pipeline createPipeline(bool syncNN, bool subpixel, std::string nnPath, int confidence, int LRchecktresh, std::string monoResolutionStr, bool fullFrameTracking) {
     dai::Pipeline pipeline;
-    dai::ColorCameraProperties::SensorResolution colorResolution;
     dai::node::MonoCamera::Properties::SensorResolution monoResolution;
     auto colorCam = pipeline.create<dai::node::ColorCamera>();
     auto spatialDetectionNetwork = pipeline.create<dai::node::YoloSpatialDetectionNetwork>();
@@ -55,18 +54,7 @@ dai::Pipeline createPipeline(bool syncNN, bool subpixel, std::string nnPath, int
     xoutTracker->setStreamName("tracklets");
 
     colorCam->setPreviewSize(416, 416);
-    if (colorResolutionStr == "720p") {
-        colorResolution = dai::ColorCameraProperties::SensorResolution::THE_720_P;
-    } else if (colorResolutionStr == "1080p") {
-        colorResolution = dai::ColorCameraProperties::SensorResolution::THE_1080_P;
-    } else if (colorResolutionStr == "4K") {
-        colorResolution = dai::ColorCameraProperties::SensorResolution::THE_4_K;
-    } else {
-        RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Invalid parameter. -> colorResolution: %s", colorResolutionStr.c_str());
-        throw std::runtime_error("Invalid color camera resolution.");
-    }
-    
-    colorCam->setResolution(colorResolution);
+    colorCam->setResolution(dai::ColorCameraProperties::SensorResolution::THE_1080_P);
     colorCam->setInterleaved(false);
     colorCam->setColorOrder(dai::ColorCameraProperties::ColorOrder::BGR);
 
@@ -124,9 +112,9 @@ dai::Pipeline createPipeline(bool syncNN, bool subpixel, std::string nnPath, int
     if(fullFrameTracking) {
         colorCam->setPreviewKeepAspectRatio(false);
         colorCam->video.link(tracker->inputTrackerFrame);
-        // tracker->inputTrackerFrame.setBlocking(false);
+        tracker->inputTrackerFrame.setBlocking(false);
         //  do not block the pipeline if it's too slow on full frame
-        // tracker->inputTrackerFrame.setQueueSize(2);
+        tracker->inputTrackerFrame.setQueueSize(2);
     } else {
         spatialDetectionNetwork->passthrough.link(tracker->inputTrackerFrame);
     }
@@ -149,7 +137,6 @@ int main(int argc, char** argv) {
     std::string nnName(BLOB_NAME);  // Set your blob name for the model here
     bool syncNN, subpixel, fullFrameTracking;
     int confidence = 200, LRchecktresh = 5;
-    std::string colorResolution = "4K";
     std::string monoResolution = "400p";
 
     node->declare_parameter("namespace", "");
@@ -160,7 +147,6 @@ int main(int argc, char** argv) {
     node->declare_parameter("nnName", "");
     node->declare_parameter("confidence", confidence);
     node->declare_parameter("LRchecktresh", LRchecktresh);
-    node->declare_parameter("colorResolution", colorResolution);
     node->declare_parameter("monoResolution", monoResolution);
     node->declare_parameter("resourceBaseFolder", "");
     node->declare_parameter("fullFrameTracking", false);
@@ -172,7 +158,6 @@ int main(int argc, char** argv) {
     node->get_parameter("subpixel", subpixel);
     node->get_parameter("confidence", confidence);
     node->get_parameter("LRchecktresh", LRchecktresh);
-    node->get_parameter("colorResolution", colorResolution);
     node->get_parameter("monoResolution", monoResolution);
     node->get_parameter("resourceBaseFolder", resourceBaseFolder);
     node->get_parameter("fullFrameTracking", fullFrameTracking);
@@ -188,7 +173,7 @@ int main(int argc, char** argv) {
     }
 
     nnPath = resourceBaseFolder + "/" + nnName;
-    dai::Pipeline pipeline = createPipeline(syncNN, subpixel, nnPath, confidence, LRchecktresh, colorResolution,  monoResolution, fullFrameTracking);
+    dai::Pipeline pipeline = createPipeline(syncNN, subpixel, nnPath, confidence, LRchecktresh, monoResolution, fullFrameTracking);
     dai::Device device(pipeline);
 
     auto colorQueue = device.getOutputQueue("preview", 30, false);
@@ -197,18 +182,12 @@ int main(int argc, char** argv) {
     auto calibrationHandler = device.readCalibration();
 
     int colorWidth, colorHeight;
-    if (colorResolution == "720p") {
-        colorWidth = 1280;
-        colorHeight = 720;
-    } else if (colorResolution == "1080p") {
+    if (!fullFrameTracking) {
+        colorWidth = 416;
+        colorHeight = 416;
+    } else {
         colorWidth = 1920;
         colorHeight = 1080;
-    } else if (colorResolution == "4K") {
-        colorWidth = 3840;
-        colorHeight = 2160;
-    } else {
-        RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Invalid parameter. -> colorResolution: %s", colorResolution.c_str());
-        throw std::runtime_error("Invalid color camera resolution.");
     }
 
     int monoWidth, monoHeight;

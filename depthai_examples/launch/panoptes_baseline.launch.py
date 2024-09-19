@@ -35,7 +35,6 @@ def launch_setup(context, *args, **kwargs):
     fullFrameTracking = LaunchConfiguration('fullFrameTracking', default='false').perform(context)
     namespace = LaunchConfiguration("namespace", default="").perform(context)
     name = LaunchConfiguration("name").perform(context)
-    colorResolution = LaunchConfiguration("colorResolution").perform(context)
     monoResolution = LaunchConfiguration("monoResolution").perform(context)
 
     color_sens_name = 'rgb'
@@ -70,11 +69,10 @@ def launch_setup(context, *args, **kwargs):
                 'namespace' : namespace,
                 'tf_prefix': name,
                 'camera_param_uri': camera_param_uri,
-                'sync_nn': bool(sync_nn),
+                'sync_nn': sync_nn == 'true',
                 'nnName': nnName,
                 'resourceBaseFolder': resourceBaseFolder,
-                'fullFrameTracking': bool(fullFrameTracking),
-                'colorResolution': colorResolution,
+                'fullFrameTracking': fullFrameTracking == 'true',
                 'monoResolution': monoResolution,
             }],
         ),
@@ -112,7 +110,6 @@ def generate_launch_description():
         DeclareLaunchArgument('nnName', default_value='x'),
         DeclareLaunchArgument('resourceBaseFolder', default_value=os.path.join(depthai_examples_path, 'resources')),
         DeclareLaunchArgument('fullFrameTracking', default_value='false'),
-        DeclareLaunchArgument('colorResolution', default_value='1080p'),
         DeclareLaunchArgument('monoResolution', default_value='400p')
     ]
 
